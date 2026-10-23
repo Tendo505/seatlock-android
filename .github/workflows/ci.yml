@@ -19,9 +19,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
-      - name: Install SDK packages
-        run: sdkmanager "platforms;android-36.1" "build-tools;36.1.0"
+      - name: Install SDK packages (runner image ships the Android SDK)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36.1" "build-tools;36.1.0" > /dev/null
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit + Robolectric UI tests
         run: ./gradlew testDebugUnitTest --console=plain
