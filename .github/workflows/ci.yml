@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test & build APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-36.1" "build-tools;36.1.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit + Robolectric UI tests
+        run: ./gradlew testDebugUnitTest --console=plain
+      - name: Build release APK (R8 minified)
+        run: ./gradlew assembleRelease --console=plain
+      - run: cp app/build/outputs/apk/release/app-release.apk seatlock-${{ github.ref_name }}.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seatlock-apk
+          path: seatlock-*.apk
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: seatlock-apk
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" seatlock-*.apk \
+            --repo "${{ github.repository }}" \
+            --title "SeatLock ${{ github.ref_name }}" \
+            --notes "Installable demo APK (Android 8.0+). Works offline in demo mode, or connect it to a running [SeatLock API](https://github.com/Tendo505/seatlock) under Settings."
